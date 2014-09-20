@@ -8,12 +8,30 @@
 
 #include "resource.h"
 
+#include "KinectClient.h"
+
+
+const int SENDPORT = 8000;
+const int RECVPORT = 9000;
+
+
+
+
 class CBodyBasics
 {
-    static const int        cDepthWidth  = 512;
-    static const int        cDepthHeight = 424;
+    static const int        cDepthWidth  = 720;
+    static const int        cDepthHeight = 406;
+
+	// UDP
+	KinectClient clients[MAXSOCKETS];
+	int kptr;
+	UdpSocket recvsock;
+	UdpSocket sock;
+	
+
 
 public:
+	KinectClient testClient;
 
     /// <summary>
     /// Constructor
@@ -152,6 +170,18 @@ private:
     /// <param name="joint1">other joint of the bone to draw</param>
     void                    DrawBone(const Joint* pJoints, const D2D1_POINT_2F* pJointPoints, JointType joint0, JointType joint1);
 
-	void					printFucker(std::string s);
-};
+	/// <summary>
+	/// Transmit new body data
+	/// <param name="nTime">timestamp of frame</param>
+	/// <param name="nBodyCount">body data count</param>
+	/// <param name="ppBodies">body data in frame</param>
+	/// </summary>
+	void                    TransmitBody(INT64 nTime, int nBodyCount, IBody** ppBodies);
 
+	void					StartOSC();
+
+	void					ParseOSC();
+
+	void					printFucker(std::string s);
+
+};

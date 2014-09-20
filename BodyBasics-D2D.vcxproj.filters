@@ -2,6 +2,8 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="BodyBasics.cpp" />
+    <ClCompile Include="TransmitData.cpp" />
+    <ClCompile Include="KinectClient.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BodyBasics.h" />
@@ -13,6 +15,7 @@
     <ClInclude Include="oscpkt\udp.hh">
       <Filter>oscpkt</Filter>
     </ClInclude>
+    <ClInclude Include="KinectClient.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="BodyBasics.rc" />

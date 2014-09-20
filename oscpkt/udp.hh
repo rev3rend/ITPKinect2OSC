@@ -23,6 +23,8 @@
   (this is the zlib license)
 */
 
+#pragma once
+
 #ifndef OSCPKT_UDP_HH
 #define OSCPKT_UDP_HH
 

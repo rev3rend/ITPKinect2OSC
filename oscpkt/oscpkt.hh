@@ -53,6 +53,8 @@
   (this is the zlib license)
 */
 
+#pragma once
+
 #ifndef OSCPKT_HH
 #define OSCPKT_HH
 
