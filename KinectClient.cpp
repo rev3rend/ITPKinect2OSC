@@ -9,6 +9,7 @@
 KinectClient::KinectClient()
 {
 	address = "localhost";
+	active = false;
 
 
 }
@@ -25,4 +26,14 @@ void KinectClient::printFucker(std::string s)
 	std::wstring stemp = std::wstring(s.begin(), s.end());
 	LPCWSTR sw = stemp.c_str();
 	OutputDebugString(sw);
+}
+
+KinectQuery::KinectQuery()
+{
+
+}
+
+KinectQuery::~KinectQuery()
+{
+
 }

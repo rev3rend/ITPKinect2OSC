@@ -6,6 +6,9 @@
 
 #pragma once
 
+#include <map>
+#include <array>
+
 #include "resource.h"
 
 #include "KinectClient.h"
@@ -23,10 +26,11 @@ class CBodyBasics
     static const int        cDepthHeight = 406;
 
 	// UDP
-	KinectClient clients[MAXSOCKETS];
-	int kptr;
+	std::array<KinectClient, MAXSOCKETS> clients;
 	UdpSocket recvsock;
 	UdpSocket sock;
+
+	std::map<std::string, int> j2i;
 	
 
 
@@ -177,6 +181,8 @@ private:
 	/// <param name="ppBodies">body data in frame</param>
 	/// </summary>
 	void                    TransmitBody(INT64 nTime, int nBodyCount, IBody** ppBodies);
+
+	void					CreateMap();
 
 	void					StartOSC();
 

@@ -27,17 +27,16 @@ void CBodyBasics::StartOSC()
 	// INITAL SENDER
 
 	//sock.connectTo("localhost", 8000);
-	kptr = 0;
-	clients[kptr].address = "localhost";
-	clients[kptr].socket.connectTo("localhost", SENDPORT);
+	clients[0].address = "localhost";
+	clients[0].socket.connectTo("localhost", SENDPORT);
+	clients[0].active = true;
 
 	Message msg;
 	PacketWriter pw;
-	msg.init("/baz");
+	msg.init("/connected");
 	pw.init();
 	pw.startBundle().startBundle().addMessage(msg).endBundle().endBundle();
-	clients[kptr].socket.sendPacket(pw.packetData(), pw.packetSize());
-	kptr++;
+	clients[0].socket.sendPacket(pw.packetData(), pw.packetSize());
 
 }
 
@@ -67,23 +66,50 @@ void CBodyBasics::ParseOSC()
 			printFucker(s);
 
 			if (msg->match("/connect").isOkNoMoreArgs()) {
-				// reconnect on new IP address
-				clients[kptr].address = c;
-				clients[kptr].socket.connectTo(c, SENDPORT);
-				kptr++;
-
-			}
-			/*
-			else if (msg->match("/disconnect").isOkNoMoreArgs()) {
-				for (int i = 0; i < kptr; i++)
+				// find empty client - check existing list
+				int foundmatch = 0;
+				for (int i = 0; i < clients.size(); i++)
 				{
-					if (clients[i].address == c)
+					if (clients[i].address == c) // already in list
 					{
-						clients.erase(clients.begin() + i);
+						clients[i].active = 1;
+						foundmatch = 1;
 						break;
 					}
 				}
-			}*/
+				if (foundmatch == 0) // add new client to first free slot
+				{
+					for (int i = 0; i < clients.size(); i++)
+					{
+						if (clients[i].active == false) // add here
+						{
+							clients[i].address = c;
+							clients[i].active = true;
+							clients[i].socket.connectTo(c, SENDPORT);
+							foundmatch = 1;
+							break;
+						}
+					}
+				}
+				if (foundmatch = 0) // out of slots
+				{
+					std::string s = "Out of slots!!!\n";
+					printFucker(s);
+
+				}
+
+			}
+			
+			else if (msg->match("/disconnect").isOkNoMoreArgs()) {
+				for (int i = 0; i < clients.size(); i++)
+				{
+					if (clients[i].address == c) // shut it off
+					{
+						clients[i].active = false;
+						break;
+					}
+				}
+			}
 			
 			else {
 				std::string s = "Server: unhandled message! \n";
@@ -102,84 +128,118 @@ void CBodyBasics::TransmitBody(INT64 nTime, int nBodyCount, IBody** ppBodies)
 	HRESULT hr;
 
 	
-	for (int cptr = 0; cptr < kptr; cptr++)
+	for (int cptr = 0; cptr < clients.size(); cptr++)
 	{
-		printFucker("sending to client " + clients[cptr].address + ": " + std::to_string(nBodyCount) + " bodies!\n");
+		if (clients[cptr].active == 1) {
+			printFucker("sending to client " + clients[cptr].address + ": " + std::to_string(nBodyCount) + " bodies!\n");
 
-		// SEND FRAME START OVER UDP
-		msg.init("/beginFrame");
-		msg.pushInt32(nBodyCount);
-		pw.init();
-		pw.startBundle().startBundle().addMessage(msg).endBundle().endBundle();
-		ok = clients[cptr].socket.sendPacket(pw.packetData(), pw.packetSize());
+			// SEND FRAME START OVER UDP
+			msg.init("/beginFrame");
+			msg.pushInt32(nBodyCount);
+			pw.init();
+			pw.startBundle().startBundle().addMessage(msg).endBundle().endBundle();
+			ok = clients[cptr].socket.sendPacket(pw.packetData(), pw.packetSize());
 
 
-		for (int i = 0; i < nBodyCount; ++i)
-		{
-			IBody* pBody = ppBodies[i];
-			if (pBody)
+			for (int i = 0; i < nBodyCount; ++i)
 			{
-				BOOLEAN bTracked = false;
-				hr = pBody->get_IsTracked(&bTracked);
-
-				if (SUCCEEDED(hr) && bTracked)
+				IBody* pBody = ppBodies[i];
+				if (pBody)
 				{
-					Joint joints[JointType_Count];
-					D2D1_POINT_2F jointPoints[JointType_Count];
-					HandState leftHandState = HandState_Unknown;
-					HandState rightHandState = HandState_Unknown;
+					BOOLEAN bTracked = false;
+					hr = pBody->get_IsTracked(&bTracked);
 
-					pBody->get_HandLeftState(&leftHandState);
-					pBody->get_HandRightState(&rightHandState);
-
-					hr = pBody->GetJoints(_countof(joints), joints);
-					if (SUCCEEDED(hr))
+					if (SUCCEEDED(hr) && bTracked)
 					{
-						msg.init("/beginBody");
-						msg.pushInt32(i);
-						pw.init();
-						pw.startBundle().startBundle().addMessage(msg).endBundle().endBundle();
-						ok = clients[cptr].socket.sendPacket(pw.packetData(), pw.packetSize());
+						Joint joints[JointType_Count];
+						D2D1_POINT_2F jointPoints[JointType_Count];
+						HandState leftHandState = HandState_Unknown;
+						HandState rightHandState = HandState_Unknown;
 
-						for (int j = 0; j < _countof(joints); ++j)
+						pBody->get_HandLeftState(&leftHandState);
+						pBody->get_HandRightState(&rightHandState);
+
+						hr = pBody->GetJoints(_countof(joints), joints);
+						if (SUCCEEDED(hr))
 						{
-							// /kinect body joint x y z
-							msg.init("/bodyJoint");
+							msg.init("/beginBody");
 							msg.pushInt32(i);
-							msg.pushInt32(j);
-							// body relative - joints[1] is spineMid which maps to Torso in OpenNI
-							msg.pushFloat(joints[j].Position.X - joints[1].Position.X);
-							msg.pushFloat(joints[j].Position.Y - joints[1].Position.Y);
-							msg.pushFloat(joints[j].Position.Z - joints[1].Position.Z);
-							// send message
 							pw.init();
 							pw.startBundle().startBundle().addMessage(msg).endBundle().endBundle();
 							ok = clients[cptr].socket.sendPacket(pw.packetData(), pw.packetSize());
 
+							for (int j = 0; j < _countof(joints); ++j)
+							{
+								// /kinect body joint x y z
+								msg.init("/bodyJoint");
+								msg.pushInt32(i);
+								msg.pushInt32(j);
+								// body relative - joints[1] is spineMid which maps to Torso in OpenNI
+								msg.pushFloat(joints[j].Position.X - joints[1].Position.X);
+								msg.pushFloat(joints[j].Position.Y - joints[1].Position.Y);
+								msg.pushFloat(joints[j].Position.Z - joints[1].Position.Z);
+								// send message
+								pw.init();
+								pw.startBundle().startBundle().addMessage(msg).endBundle().endBundle();
+								ok = clients[cptr].socket.sendPacket(pw.packetData(), pw.packetSize());
+
+							}
+
+							msg.init("/endBody");
+							msg.pushInt32(i);
+							pw.init();
+							pw.startBundle().startBundle().addMessage(msg).endBundle().endBundle();
+							ok = clients[cptr].socket.sendPacket(pw.packetData(), pw.packetSize());
 						}
 
-						msg.init("/endBody");
-						msg.pushInt32(i);
-						pw.init();
-						pw.startBundle().startBundle().addMessage(msg).endBundle().endBundle();
-						ok = clients[cptr].socket.sendPacket(pw.packetData(), pw.packetSize());
+
 					}
-
-
 				}
 			}
+
+
+			// SEND FRAME END OVER UDP
+			msg.init("/endFrame");
+			pw.init();
+			pw.startBundle().startBundle().addMessage(msg).endBundle().endBundle();
+			ok = clients[cptr].socket.sendPacket(pw.packetData(), pw.packetSize());
+
+
 		}
-
-
-		// SEND FRAME END OVER UDP
-		msg.init("/endFrame");
-		pw.init();
-		pw.startBundle().startBundle().addMessage(msg).endBundle().endBundle();
-		ok = clients[cptr].socket.sendPacket(pw.packetData(), pw.packetSize());
-
-
 	}
 
 }
 
 
+void CBodyBasics::CreateMap()
+{
+	j2i["basespine"]		= 0;
+	j2i["spinebase"] = 0; // dup
+	j2i["midspine"] = 1;
+	j2i["spinemid"] = 1; // dup
+	j2i["torso"] = 1; // dup
+	j2i["neck"] = 2;
+	j2i["head"]				= 3;
+	j2i["leftshoulder"]		= 4;
+	j2i["leftelbow"]		= 5;
+	j2i["leftwrist"]		= 6;
+	j2i["lefthand"]			= 7;
+	j2i["rightshoulder"]	= 8;
+	j2i["rightelbow"]		= 9;
+	j2i["rightwrist"]		= 10;
+	j2i["righthand"]		= 11;
+	j2i["lefthip"]			= 12;
+	j2i["leftknee"]			= 13;
+	j2i["leftankle"]		= 14;
+	j2i["leftfoot"]			= 15;
+	j2i["righthip"]			= 16;
+	j2i["rightknee"]		= 17;
+	j2i["rightankle"]		= 18;
+	j2i["rightfoot"]		= 19;
+	j2i["shoulderspine"]	= 20;
+	j2i["spineshoulder"] = 20; // dup
+	j2i["lefthandtip"] = 21;
+	j2i["leftthumb"]		= 22;
+	j2i["righthandtip"]		= 23;
+	j2i["rightthumb"]		= 24;
+}

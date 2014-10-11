@@ -6,15 +6,13 @@
 
 #include <iostream>   // std::cout
 #include <string>     // std::string, std::to_string
+#include <map>
 #include "stdafx.h"
 #include <strsafe.h>
 #include "resource.h"
 #include "BodyBasics.h"
 
-
-
-
-
+// viz constants
 static const float c_JointThickness = 3.0f;
 static const float c_TrackedBoneThickness = 6.0f;
 static const float c_InferredBoneThickness = 1.0f;
@@ -116,6 +114,10 @@ int CBodyBasics::Run(HINSTANCE hInstance, int nCmdShow)
 	{
 		return 0;
 	}
+
+	// create joint symbol map
+	CreateMap();
+
 
 	// start OSC
 	StartOSC();
