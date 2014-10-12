@@ -344,9 +344,10 @@ void CBodyBasics::ProcessBody(INT64 nTime, int nBodyCount, IBody** ppBodies)
 			GetClientRect(GetDlgItem(m_hWnd, IDC_VIDEOVIEW), &rct);
 			int width = rct.right;
 			int height = rct.bottom;
-
-
 			
+
+			// DRAW DEBUGGING STUFF
+			// to do...
 
 			for (int i = 0; i < nBodyCount; ++i)
 			{
@@ -387,6 +388,7 @@ void CBodyBasics::ProcessBody(INT64 nTime, int nBodyCount, IBody** ppBodies)
 					}
 				}
 			}
+
 
 			hr = m_pRenderTarget->EndDraw();
 

@@ -51,7 +51,6 @@ void CBodyBasics::ParseOSC()
 		pr.init(recvsock.packetData(), recvsock.packetSize());
 		oscpkt::Message *msg;
 		while (pr.isOk() && (msg = pr.popMessage()) != 0) {
-			int iarg;
 
 			// parse IP address
 			std::string c = recvsock.packetOrigin().asString();
@@ -65,6 +64,11 @@ void CBodyBasics::ParseOSC()
 			std::string s = "Server: received message from " + c + "\n";
 			printFucker(s);
 
+			//
+			// parse messages
+			//
+
+			// CONNECT
 			if (msg->match("/connect").isOkNoMoreArgs()) {
 				// find empty client - check existing list
 				int foundmatch = 0;
@@ -72,6 +76,7 @@ void CBodyBasics::ParseOSC()
 				{
 					if (clients[i].address == c) // already in list
 					{
+						printFucker("RECONNECTING TO HOST " + c + ":\n");
 						clients[i].active = 1;
 						foundmatch = 1;
 						break;
@@ -83,6 +88,7 @@ void CBodyBasics::ParseOSC()
 					{
 						if (clients[i].active == false) // add here
 						{
+							printFucker("ADDING CONNECTION TO HOST " + c + ":\n");
 							clients[i].address = c;
 							clients[i].active = true;
 							clients[i].socket.connectTo(c, SENDPORT);
@@ -91,7 +97,7 @@ void CBodyBasics::ParseOSC()
 						}
 					}
 				}
-				if (foundmatch = 0) // out of slots
+				if (foundmatch == 0) // out of slots
 				{
 					std::string s = "Out of slots!!!\n";
 					printFucker(s);
@@ -99,18 +105,140 @@ void CBodyBasics::ParseOSC()
 				}
 
 			}
-			
+
+			// DISCONNECT
 			else if (msg->match("/disconnect").isOkNoMoreArgs()) {
 				for (int i = 0; i < clients.size(); i++)
 				{
 					if (clients[i].address == c) // shut it off
 					{
+						printFucker("DISCONNECTING FROM HOST " + c + ":\n");
 						clients[i].active = false;
 						break;
 					}
 				}
 			}
-			
+
+			// ADDQUERY
+			else if (msg->match("/addQuery")){
+				Message::ArgReader arg(msg->arg()); // reader for arguments
+				KinectQuery kq; // new query obect
+
+				if (arg.isStr()) // first value should be string
+				{
+					std::string firstString;
+					arg.popStr(firstString);
+					// figure out query type
+					if (firstString == "joint") kq.type = 0;
+					else if (firstString == "trigger") kq.type = 1;
+					else if (firstString == "toggle") kq.type = 2;
+					else if (firstString == "controller") kq.type = 3;
+					else if (firstString == "motion") kq.type = 4;
+					printFucker("query type: " + std::to_string(kq.type) + "\n");
+				}
+
+				// parse remaining args based on type
+
+				// joint
+				if (kq.type == 0)
+					// we want either:
+					// string... stringn int string (enumerated joints)
+					// or
+					// int string (all joints)
+				{
+					// check first arg:
+					if (arg.isInt32()) { // first arg is int: omni mode
+						kq.omni = 1; // omni: send all joints each frame
+						int p; arg.popInt32(p);
+						kq.mode = p; // 0 (world) or 1 (body) orientation for output
+
+						// check second arg
+						if (arg.isStr()) { // in omni mode, next arg should be a string
+							std::string p; arg.popStr(p);
+							kq.message = p; // message for OSC argument with joint data inside
+							kq.valid = 1; // valid query
+						}
+					}
+
+					else if (arg.isStr()) { // first arg is string: individual joints
+						kq.omni = 0;
+						std::string p; arg.popStr(p);
+						if (j2i.count(p) == 1) kq.joints.push_back(j2i[p]); // first joint to use
+						while (arg.nbArgRemaining()) { // iterate until int
+							if (arg.isStr()) {
+								std::string f; arg.popStr(f); // another joint
+								if(j2i.count(f)==1) kq.joints.push_back(j2i[f]);
+							}
+							else {
+								break; // get outta here
+							}
+						}
+						// check next-to-last arg:
+						if (arg.isInt32()) { // first arg is int: omni mode
+							int f; arg.popInt32(f);
+							kq.mode = f; // 0 (world) or 1 (body) orientation for output
+
+							// check last arg
+							if (arg.isStr()) { // in omni mode, next arg should be a string
+								std::string f; arg.popStr(f);
+								kq.message = f; // message for OSC argument with joint data inside
+								kq.valid = 1; // valid query
+							}
+
+						}
+					}
+
+					if (kq.valid == 1)
+					{
+						// DEBUG
+						printFucker("ADDING JOINT QUERY for host " + c + ":\n");
+						printFucker("OMNI: " + std::to_string(kq.omni) + " ");
+						if (kq.omni == 0)
+						{
+							printFucker("JOINTS: ");
+							for (int j = 0; j < kq.joints.size(); j++)
+							{
+								printFucker(std::to_string(kq.joints[j]) + " ");
+							}
+						}
+						printFucker("MODE: " + std::to_string(kq.mode) + " ");
+						printFucker("MESSAGE: " + kq.message + "\n");
+
+						// PUSH ONTO STACK
+						for (int i = 0; i < clients.size(); i++)
+						{
+							if (clients[i].address == c && clients[i].active == true) // add here
+							{
+								// avoid duplicate queries by message
+								int ismatched = -1;
+								for (int j = 0; j < clients[i].query.size(); j++)
+								{
+									if (clients[i].query[j].message == kq.message) // match
+									{
+										ismatched = j;
+										break;
+									}
+								}
+								if (ismatched == -1) // new message 
+								{
+									clients[i].query.push_back(kq);
+									printFucker("ADDED QUERY SLOT: " + std::to_string(clients[i].query.size() - 1));
+									break;
+								}
+								else // replace old message in queue with same query name
+								{
+									clients[i].query[ismatched] = kq;
+									printFucker("REPLACED QUERY SLOT: " + std::to_string(ismatched));
+									break;
+								}
+							}
+						}
+
+					}
+				}
+
+			}
+
 			else {
 				std::string s = "Server: unhandled message! \n";
 				printFucker(s);
@@ -131,7 +259,7 @@ void CBodyBasics::TransmitBody(INT64 nTime, int nBodyCount, IBody** ppBodies)
 	for (int cptr = 0; cptr < clients.size(); cptr++)
 	{
 		if (clients[cptr].active == 1) {
-			printFucker("sending to client " + clients[cptr].address + ": " + std::to_string(nBodyCount) + " bodies!\n");
+			//printFucker("sending to client " + clients[cptr].address + ": " + std::to_string(nBodyCount) + " bodies!\n");
 
 			// SEND FRAME START OVER UDP
 			msg.init("/beginFrame");

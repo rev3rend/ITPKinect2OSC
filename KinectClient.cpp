@@ -30,7 +30,7 @@ void KinectClient::printFucker(std::string s)
 
 KinectQuery::KinectQuery()
 {
-
+	valid = 0; // assume bad query
 }
 
 KinectQuery::~KinectQuery()

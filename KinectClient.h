@@ -12,10 +12,12 @@ using namespace oscpkt;
 class KinectQuery
 {
 public:
-	// type: 0 = bodyJoint, 1 = trigger, 2 = toggle, 3 = controller, 4 = motion, 5 = position
+	// type: 0 = joint, 1 = trigger, 2 = toggle, 3 = controller, 4 = motion
 	int type;
 	std::string message;
-	int mode; // for bodyJoint, position (world or body)
+	int mode; // for joint, position (world or body)
+	int omni; // for joint, all joints or just some
+	std::vector<int> joints; // for joint... list of joints
 	int j1;
 	int j2; // for trigger, toggle, controller
 	int polarity; // for trigger, toggle
@@ -25,6 +27,7 @@ public:
 	float debounce; //for trigger
 	float min; // for controller
 	float max; // for controller
+	int valid; // valid query?
 	KinectQuery();
 	~KinectQuery();
 
@@ -39,7 +42,7 @@ public:
 	std::string address;
 	bool active;
 	UdpSocket socket;
-	std::vector<KinectQuery> kc;
+	std::vector<KinectQuery> query;
 	KinectClient();
 	KinectClient(std::string p_address);
 	~KinectClient();
